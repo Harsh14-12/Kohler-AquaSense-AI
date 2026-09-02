@@ -11,6 +11,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import sessionmaker
 
 from schemas.telemetry import SensorReading
+from maintenance.ticket_schemas import MaintenanceTicket
 from simulator.facility_topology import (
     FacilityDefinition,
     FixtureDefinition,
@@ -21,6 +22,7 @@ from simulator.facility_topology import (
 from .models import (
     FacilityModel,
     FixtureModel,
+    MaintenanceTicketModel,
     SensorModel,
     SensorReadingModel,
     ZoneModel,
@@ -112,6 +114,89 @@ class TelemetryRepository:
             )
             session.commit()
 
+    def save_maintenance_ticket(self, ticket: MaintenanceTicket) -> None:
+        """Persist a maintenance ticket."""
+
+        with self._session_factory() as session:
+            existing = session.get(
+                MaintenanceTicketModel,
+                ticket.ticket_id,
+            )
+
+            if existing is None:
+                session.add(
+                    self._build_maintenance_ticket_model(ticket)
+                )
+            else:
+                self._update_maintenance_ticket_model(
+                    existing,
+                    ticket,
+                )
+
+            session.commit()
+
+    def get_maintenance_ticket(
+        self,
+        ticket_id: str,
+    ) -> MaintenanceTicket | None:
+        """Retrieve one maintenance ticket by ID."""
+
+        with self._session_factory() as session:
+            row = session.get(
+                MaintenanceTicketModel,
+                ticket_id,
+            )
+
+            if row is None:
+                return None
+
+            return self._maintenance_ticket_to_schema(row)
+
+    def get_open_maintenance_tickets(
+        self,
+    ) -> list[MaintenanceTicket]:
+        """Retrieve all active maintenance tickets."""
+
+        with self._session_factory() as session:
+            statement = (
+                select(MaintenanceTicketModel)
+                .where(
+                    MaintenanceTicketModel.status.notin_(
+                        ["resolved", "cancelled"]
+                    )
+                )
+                .order_by(MaintenanceTicketModel.created_at)
+            )
+
+            rows = session.scalars(statement).all()
+
+            return [
+                self._maintenance_ticket_to_schema(row)
+                for row in rows
+            ]
+
+    def get_maintenance_ticket_history(
+        self,
+        limit: int = 100,
+    ) -> list[MaintenanceTicket]:
+        """Retrieve maintenance ticket history."""
+
+        with self._session_factory() as session:
+            statement = (
+                select(MaintenanceTicketModel)
+                .order_by(
+                    desc(MaintenanceTicketModel.created_at)
+                )
+                .limit(limit)
+            )
+
+            rows = session.scalars(statement).all()
+
+            return [
+                self._maintenance_ticket_to_schema(row)
+                for row in rows
+            ]
+
     def get_recent_readings(self, limit: int = 100) -> list[SensorReading]:
         with self._session_factory() as session:
             statement = (
@@ -173,4 +258,74 @@ class TelemetryRepository:
             diagnostic_status=row.diagnostic_status,
             quality_flag=row.quality_flag,
             metadata=json.loads(row.metadata_json),
+        )
+
+    @staticmethod
+    def _build_maintenance_ticket_model(
+        ticket: MaintenanceTicket,
+    ) -> MaintenanceTicketModel:
+        return MaintenanceTicketModel(
+            ticket_id=ticket.ticket_id,
+            facility_id=ticket.facility_id,
+            zone_id=ticket.zone_id,
+            fixture_id=ticket.fixture_id,
+            anomaly_type=ticket.anomaly_type,
+            source_event_id=ticket.source_event_id,
+            priority=ticket.priority.value,
+            risk_score=float(ticket.risk_score),
+            title=ticket.title,
+            description=ticket.description,
+            recommended_action=ticket.recommended_action,
+            created_at=ticket.created_at,
+            status=ticket.status.value,
+            evidence_json=json.dumps(
+                ticket.evidence,
+                sort_keys=True,
+            ),
+            deduplication_key=ticket.deduplication_key,
+        )
+
+    @staticmethod
+    def _update_maintenance_ticket_model(
+        row: MaintenanceTicketModel,
+        ticket: MaintenanceTicket,
+    ) -> None:
+        row.facility_id = ticket.facility_id
+        row.zone_id = ticket.zone_id
+        row.fixture_id = ticket.fixture_id
+        row.anomaly_type = ticket.anomaly_type
+        row.source_event_id = ticket.source_event_id
+        row.priority = ticket.priority.value
+        row.risk_score = float(ticket.risk_score)
+        row.title = ticket.title
+        row.description = ticket.description
+        row.recommended_action = ticket.recommended_action
+        row.created_at = ticket.created_at
+        row.status = ticket.status.value
+        row.evidence_json = json.dumps(
+            ticket.evidence,
+            sort_keys=True,
+        )
+        row.deduplication_key = ticket.deduplication_key
+
+    @staticmethod
+    def _maintenance_ticket_to_schema(
+        row: MaintenanceTicketModel,
+    ) -> MaintenanceTicket:
+        return MaintenanceTicket(
+            ticket_id=row.ticket_id,
+            facility_id=row.facility_id,
+            zone_id=row.zone_id,
+            fixture_id=row.fixture_id,
+            anomaly_type=row.anomaly_type,
+            source_event_id=row.source_event_id,
+            priority=row.priority,
+            risk_score=row.risk_score,
+            title=row.title,
+            description=row.description,
+            recommended_action=row.recommended_action,
+            created_at=row.created_at,
+            status=row.status,
+            evidence=json.loads(row.evidence_json),
+            deduplication_key=row.deduplication_key,
         )

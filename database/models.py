@@ -91,3 +91,44 @@ class SensorReadingModel(Base):
     metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
 
     sensor: Mapped[SensorModel] = relationship(back_populates="readings")
+
+class MaintenanceTicketModel(Base):
+    __tablename__ = "maintenance_ticket"
+
+    ticket_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+
+    facility_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("facility.facility_id"), nullable=False, index=True
+    )
+    zone_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("zone.zone_id"), nullable=False, index=True
+    )
+    fixture_id: Mapped[str] = mapped_column(
+        String(128), ForeignKey("fixture.fixture_id"), nullable=False, index=True
+    )
+
+    anomaly_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_event_id: Mapped[str] = mapped_column(String(128), nullable=False)
+
+    priority: Mapped[str] = mapped_column(String(32), nullable=False)
+    risk_score: Mapped[float] = mapped_column(Float, nullable=False)
+
+    title: Mapped[str] = mapped_column(String(256), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    recommended_action: Mapped[str] = mapped_column(Text, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, index=True
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(32), nullable=False, index=True
+    )
+
+    evidence_json: Mapped[str] = mapped_column(
+        Text, nullable=False, default="{}"
+    )
+
+    deduplication_key: Mapped[str] = mapped_column(
+        String(256), nullable=False, index=True
+    )
