@@ -1,9 +1,23 @@
+﻿# Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Databases and generated data
 *.db
 *.sqlite
 *.sqlite3
-.venv/
-venv/
+data/*.csv
+
+# Environment / secrets
 .env
+.env.*
+
+# IDE
+.vscode/
+.idea/

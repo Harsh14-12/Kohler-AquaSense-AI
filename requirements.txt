@@ -1,7 +1,6 @@
 pydantic==1.10.19
 SQLAlchemy==2.0.36
 pytest==8.3.3
-pydantic==1.10.19
-SQLAlchemy==2.0.36
-pytest==8.3.3
 scikit-learn==1.5.2
+pandas
+streamlit

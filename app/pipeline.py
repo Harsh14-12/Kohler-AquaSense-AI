@@ -186,7 +186,7 @@ class AquaSensePipeline:
 
         risk_result = self.risk_engine.calculate(risk_input)
 
-        # ---------------------------------------------------------
+                # ---------------------------------------------------------
         # 8. Maintenance ticket
         # ---------------------------------------------------------
         maintenance_ticket, ticket_created = (
@@ -196,6 +196,55 @@ class AquaSensePipeline:
                 created_at=rule_event.timestamp,
             )
         )
+
+        # ---------------------------------------------------------
+        # 9. Attach sustainability impact to ticket evidence
+        # ---------------------------------------------------------
+        #
+        # The sustainability engine calculates the values, but
+        # the maintenance ticket is the object persisted by the
+        # current demo workflow. Store the calculated values in
+        # ticket evidence so the dashboard can display the same
+        # numbers without hard-coding them.
+        #
+        # This keeps the architecture:
+        #
+        # Anomaly -> Sustainability Engine -> Ticket Evidence
+        #                              -> Dashboard
+        #
+        # rather than:
+        #
+        # Anomaly -> hard-coded dashboard numbers
+        #
+        sustainability_evidence = {
+            "litres_wasted": sustainability_impact.litres_wasted,
+            "potential_litres_saved": (
+                sustainability_impact.potential_litres_saved
+            ),
+            "estimated_cost": sustainability_impact.estimated_cost,
+            "potential_cost_saving": (
+                sustainability_impact.potential_cost_saving
+            ),
+            "estimated_co2e_kg": (
+                sustainability_impact.estimated_co2e_kg
+            ),
+            "excess_flow_litres_per_minute": (
+                sustainability_impact.excess_flow_litres_per_minute
+            ),
+            "duration_minutes": (
+                sustainability_impact.duration_minutes
+            ),
+            "calculation_trace": (
+                sustainability_impact.calculation_trace
+            ),
+        }
+
+        if maintenance_ticket.evidence is None:
+            maintenance_ticket.evidence = {}
+
+        maintenance_ticket.evidence[
+            "sustainability_impact"
+        ] = sustainability_evidence
 
         return PipelineResult(
             feature_vector=feature_vector,
