@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 import json
+import os
 import re
 
 import pandas as pd
@@ -10,6 +11,11 @@ import streamlit as st
 
 from database.db import create_session_factory, init_db
 from database.repository import TelemetryRepository
+
+from copilot.context import AquaSenseCopilotContext
+from copilot.engine import AquaSenseCopilotEngine
+from copilot.tools import AquaSenseCopilotTools
+from copilot.llm import AquaSenseLLM
 
 
 # ============================================================
@@ -158,6 +164,38 @@ try:
 
     repository = TelemetryRepository(
         session_factory
+    )
+
+    copilot_tools = AquaSenseCopilotTools(
+        repository
+    )
+
+    copilot_context = AquaSenseCopilotContext(
+        copilot_tools
+    )
+
+# ------------------------------------------------------------
+# Optional OpenAI LLM
+# ------------------------------------------------------------
+#
+# AquaSense does NOT require an API key.
+#
+# If OPENAI_API_KEY exists, the LLM can be enabled.
+# Otherwise the engine automatically uses its deterministic
+# local reasoning layer.
+#
+
+    copilot_llm = None
+
+    if os.getenv("OPENAI_API_KEY"):
+        try:
+            copilot_llm = AquaSenseLLM()
+        except Exception:
+            copilot_llm = None
+
+    copilot_engine = AquaSenseCopilotEngine(
+        copilot_context,
+        llm=copilot_llm,
     )
 
 except Exception as exc:
@@ -517,7 +555,7 @@ with st.sidebar:
 
     if st.button(
         "🔄 Refresh Data",
-        use_container_width=True,
+        width="stretch",
     ):
         st.rerun()
 
@@ -648,6 +686,77 @@ open_ticket_count = len(
     open_tickets_df
 )
 
+# ============================================================
+# AI COPILOT
+# ============================================================
+
+st.header("🤖 AquaSense AI Copilot")
+
+st.caption(
+    "Ask questions about current maintenance incidents, "
+    "telemetry, sensors, and fixtures. Responses are grounded "
+    "in the AquaSense operational database."
+)
+
+copilot_question = st.text_input(
+    "Ask AquaSense",
+    placeholder=(
+        "e.g. Are there any active maintenance issues?"
+    ),
+    key="copilot_question",
+)
+
+copilot_fixture_id = st.text_input(
+    "Fixture ID (optional)",
+    placeholder="Enter a fixture ID for a focused investigation",
+    key="copilot_fixture_id",
+)
+
+if st.button(
+    "Ask Copilot",
+    type="primary",
+    key="ask_copilot",
+):
+    if not copilot_question.strip():
+        st.warning("Please enter a question.")
+    else:
+        with st.spinner("Analyzing AquaSense evidence..."):
+            try:
+                response = copilot_engine.answer(
+                    copilot_question,
+                    fixture_id=(
+                        copilot_fixture_id.strip()
+                        if copilot_fixture_id.strip()
+                        else None
+                    ),
+                )
+
+                st.markdown("### 💡 Copilot Response")
+
+                st.info(response.answer)
+
+                if response.confidence is not None:
+                    st.caption(
+                        f"Grounding confidence: "
+                        f"{response.confidence:.0%}"
+                    )
+
+                if response.evidence:
+                    with st.expander(
+                        "🔎 View supporting evidence"
+                    ):
+                        for item in response.evidence:
+                            st.markdown(
+                                f"**Source:** `{item.source}`"
+                            )
+
+                            st.json(item.data)
+
+            except Exception as exc:
+                st.error(
+                    "Copilot could not process the request."
+                )
+                st.exception(exc)
 
 # ============================================================
 # LIVE OPERATIONS
@@ -1139,7 +1248,7 @@ else:
         readings_df[
             display_columns
         ].tail(100),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -1163,7 +1272,7 @@ if not readings_df.empty:
 
         st.bar_chart(
             zone_counts,
-            use_container_width=True,
+            width="stretch",
         )
 
     with col2:
@@ -1175,7 +1284,7 @@ if not readings_df.empty:
 
         st.bar_chart(
             sensor_counts,
-            use_container_width=True,
+            width="stretch",
         )
 
 
@@ -1209,7 +1318,7 @@ else:
         open_tickets_df[
             display_columns
         ],
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -1245,7 +1354,7 @@ with st.expander(
                     "Title",
                 ]
             ],
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
