@@ -1,23 +1,19 @@
-﻿# Python
+.venv/
 __pycache__/
 *.py[cod]
-.pytest_cache/
 
-# Virtual environments
-.venv/
-venv/
-env/
-
-# Databases and generated data
-*.db
-*.sqlite
-*.sqlite3
-data/*.csv
-
-# Environment / secrets
 .env
 .env.*
+!.env.example
 
-# IDE
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/*.csv
+
+*.log
+
+.streamlit/secrets.toml
+
 .vscode/
 .idea/
